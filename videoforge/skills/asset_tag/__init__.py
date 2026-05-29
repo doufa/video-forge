@@ -1,1 +1,1 @@
-from videoforge.skills.asset_tag.clip_gemini import CLIPGeminiProvider
+from videoforge.skills.asset_tag.dummy_tag import DummyTagProvider

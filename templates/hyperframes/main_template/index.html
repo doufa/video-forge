@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=1920, height=1080" />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="./data.js"></script>
     <style>
       * {
         margin: 0;
@@ -15,35 +16,71 @@
         width: 1920px;
         height: 1080px;
         overflow: hidden;
-        background: #111; /* Dark background */
+        background: #000;
         font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       }
       
-      .clip {
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+
+      .scene {
         position: absolute;
+        top: 0; left: 0;
+        width: 100%;
+        height: 100%;
+        display: none; /* hidden by default, gsap handles visibility */
+        overflow: hidden;
+      }
+
+      .bg-media {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 1;
+        filter: brightness(0.6);
+      }
+
+      .subtitle-container {
+        position: absolute;
+        bottom: 10%;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        z-index: 10;
+        padding: 0 100px;
+      }
+
+      .subtitle-text {
+        font-size: 80px;
+        color: #fff;
+        font-weight: bold;
+        text-shadow: 0 4px 12px rgba(0,0,0,0.8), 0 0 4px rgba(0,0,0,0.5);
+        background: rgba(0, 0, 0, 0.4);
+        padding: 10px 30px;
+        border-radius: 20px;
+        display: inline-block;
+      }
+      
+      .title-screen {
+        position: absolute;
+        top: 0; left: 0;
         width: 100%;
         height: 100%;
         display: flex;
-        flex-direction: column;
         justify-content: center;
         align-items: center;
-      }
-
-      #title-container {
-        font-size: 120px;
-        color: #fff;
+        background: #111;
+        color: white;
+        font-size: 100px;
         font-weight: bold;
-        text-shadow: 0 10px 20px rgba(0,0,0,0.5);
-      }
-      
-      #subtitle {
-        font-size: 64px;
-        color: #4CAF50;
-        margin-top: 40px;
-      }
-      
-      .word {
-        display: inline-block;
+        z-index: 20;
+        text-align: center;
+        padding: 100px;
       }
     </style>
   </head>
@@ -52,39 +89,103 @@
       id="root"
       data-composition-id="main"
       data-start="0"
-      data-duration="5"
       data-width="1920"
       data-height="1080"
     >
-      <div id="scene1" class="clip" data-start="0" data-duration="5" data-track-index="1">
-        <div id="title-container">
-          <span class="word">VideoForge</span>
-        </div>
-        <div id="subtitle"> Phase 1 Render Test </div>
-      </div>
+      <!-- JS 会在这里动态生成内容 -->
     </div>
 
     <script>
-      // The timeline must be exported here for HyperFrames to pick it up
+      const data = window.__VIDEOFORGE_DATA__ || { title: "Title", scenes: [], total_duration: 5 };
+      document.getElementById('root').setAttribute('data-duration', data.total_duration + 3); // 留3秒片头
+
+      const root = document.getElementById('root');
+      
+      // 1. 生成片头
+      const titleScreen = document.createElement('div');
+      titleScreen.className = 'title-screen';
+      titleScreen.id = 'title-screen';
+      titleScreen.innerText = data.title;
+      root.appendChild(titleScreen);
+
+      // 2. 生成各个 Scene
+      data.scenes.forEach(scene => {
+        const sceneDiv = document.createElement('div');
+        sceneDiv.className = 'scene';
+        sceneDiv.id = `scene-${scene.index}`;
+        
+        // 背景素材
+        if (scene.asset_path) {
+          const isVideo = scene.asset_path.toLowerCase().endsWith('.mp4');
+          if (isVideo) {
+            const video = document.createElement('video');
+            video.className = 'bg-media';
+            video.src = 'file:///' + scene.asset_path;
+            video.loop = true;
+            video.muted = true;
+            // object fit cover
+            sceneDiv.appendChild(video);
+          } else {
+            const img = document.createElement('img');
+            img.className = 'bg-media';
+            img.src = 'file:///' + scene.asset_path;
+            sceneDiv.appendChild(img);
+          }
+        }
+
+        // 字幕
+        const subContainer = document.createElement('div');
+        subContainer.className = 'subtitle-container';
+        const subText = document.createElement('div');
+        subText.className = 'subtitle-text';
+        subText.id = `sub-${scene.index}`;
+        subText.innerText = scene.narration;
+        subContainer.appendChild(subText);
+        sceneDiv.appendChild(subContainer);
+
+        root.appendChild(sceneDiv);
+      });
+
+      // 3. 构建 GSAP 时间轴
       window.__timelines = window.__timelines || {};
       const tl = gsap.timeline({ paused: true });
-      
-      // Animate the title flying in
-      tl.from("#title-container .word", { 
-          opacity: 0, 
-          y: 100, 
-          rotationX: 90, 
-          duration: 1, 
-          ease: "back.out(1.7)" 
-      }, 0.5);
-      
-      // Animate the subtitle fading in
-      tl.from("#subtitle", { 
-          opacity: 0, 
-          scale: 0.5, 
-          duration: 0.8, 
-          ease: "power2.out" 
-      }, 1.0);
+
+      // 片头动画 (0~3秒)
+      tl.set('#title-screen', { display: 'flex' }, 0);
+      tl.from('#title-screen', { opacity: 0, scale: 0.8, duration: 1 }, 0);
+      tl.to('#title-screen', { opacity: 0, scale: 1.2, duration: 1 }, 2);
+      tl.set('#title-screen', { display: 'none' }, 3);
+
+      let current_time = 3.0; // 视频内容从第3秒开始
+
+      data.scenes.forEach((scene, i) => {
+        const sceneSelector = `#scene-${scene.index}`;
+        
+        // 显示当前场景
+        tl.set(sceneSelector, { display: 'block' }, current_time);
+        
+        // 如果是视频，可以通过 GSAP 调用播放
+        // tl.call(() => {
+        //   const video = document.querySelector(`${sceneSelector} video`);
+        //   if (video) video.play();
+        // }, null, current_time);
+        
+        // 背景轻微放大效果 (Ken Burns)
+        tl.fromTo(`${sceneSelector} .bg-media`, 
+          { scale: 1.0 }, 
+          { scale: 1.1, duration: scene.duration, ease: "none" }, 
+          current_time
+        );
+
+        // 字幕弹入
+        tl.from(`${sceneSelector} .subtitle-text`, {
+          y: 50, opacity: 0, duration: 0.5, ease: "power2.out"
+        }, current_time);
+        
+        // 当前场景结束隐藏
+        current_time += scene.duration;
+        tl.set(sceneSelector, { display: 'none' }, current_time);
+      });
 
       window.__timelines["main"] = tl;
     </script>

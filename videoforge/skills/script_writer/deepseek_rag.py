@@ -62,11 +62,12 @@ class DeepSeekRAGProvider(ScriptWriterSkill):
             "    {\n"
             '      "index": 1,\n'
             '      "narration": "第一句旁白",\n'
-            '      "asset_keywords": ["space", "stars", "zoom"],\n'
+            '      "asset_keywords": ["b-roll atom animation", "stock footage space"],\n'
             '      "notes": "特效或画面提示"\n'
             "    }\n"
             "  ]\n"
-            "}"
+            "}\n"
+            "注意：为每个画面提取 1-2 个能精确代表画面内容的英文短促搜索词，存入 `asset_keywords`。这些词将用于 yt-dlp 在 YouTube 搜索高品质无版权素材（例如：\"b-roll atom animation\", \"stock footage space\", \"quantum physics background\"）。请务必使用英文短语，不要使用抽象词汇或句子。"
         )
         
         user_prompt = f"视频主题：{topic}\n核心知识点：\n{points_str}"

@@ -30,7 +30,7 @@ class HyperFramesProvider(VideoRenderSkill):
 
         # 临时工作区 (可以将数据注入到模板目录，但在生产环境应复制到临时目录)
         # 为 MVP，我们直接在 template 目录下运行，将数据写为一个 data.json 给 HTML 读取
-        data_file = template_dir / "data.json"
+        data_file = template_dir / "data.js"
         
         # 处理 data 中的 pathlib.Path 对象以便 JSON 序列化
         def serialize_paths(obj):
@@ -44,13 +44,14 @@ class HyperFramesProvider(VideoRenderSkill):
                 return serialize_paths(obj.__dict__)
             return obj
 
+        serialized_data = serialize_paths(data)
         with open(data_file, "w", encoding="utf-8") as f:
-            json.dump(serialize_paths(data), f, ensure_ascii=False, indent=2)
+            f.write("window.__VIDEOFORGE_DATA__ = ")
+            json.dump(serialized_data, f, ensure_ascii=False, indent=2)
+            f.write(";\n")
 
         logger.info(f"Rendering template {template}...")
         
-        # 调用 hyperframes render
-        # npx --yes hyperframes@0.6.55 render
         cmd = [
             "npx", 
             "--yes", 
@@ -59,7 +60,6 @@ class HyperFramesProvider(VideoRenderSkill):
         ]
         
         try:
-            # 需要在 shell 环境执行以识别 npx
             process = subprocess.run(
                 cmd,
                 cwd=str(template_dir),
@@ -75,7 +75,6 @@ class HyperFramesProvider(VideoRenderSkill):
             logger.error("HyperFrames render failed:\n" + e.stderr)
             raise RuntimeError(f"Render failed: {e.stderr}") from e
 
-        # 查找 renders 目录下最新生成的 mp4 文件
         renders_dir = template_dir / "renders"
         if not renders_dir.exists():
             raise FileNotFoundError(f"Renders directory not found: {renders_dir}")
@@ -84,16 +83,56 @@ class HyperFramesProvider(VideoRenderSkill):
         if not mp4_files:
             raise FileNotFoundError(f"No rendered mp4 found in {renders_dir}")
             
-        # 获取最新创建的文件
         output_mp4 = max(mp4_files, key=lambda p: p.stat().st_mtime)
-            
-        # 复制到项目的 output 目录
         final_output = project_root / "output" / f"{template}_output.mp4"
-        shutil.copy2(output_mp4, final_output)
         
-        # 简单计算一个时长 (实际可由 ffprobe 或模板配置决定，MVP 暂写死一个值或从 HTML 里读)
+        # 使用 ffmpeg 将各个场景的音频合并到视频中
+        # 视频本身有3秒的片头（根据 index.html 的设定）
+        scenes = serialized_data.get("scenes", [])
+        if not scenes:
+            shutil.copy2(output_mp4, final_output)
+            return RenderResult(video_path=final_output, duration_sec=serialized_data.get("total_duration", 0), resolution="1920x1080")
+            
+        logger.info("Muxing audio with ffmpeg...")
+        ffmpeg_cmd = ["ffmpeg", "-y", "-i", str(output_mp4)]
+        
+        filter_complex = []
+        amix_inputs = []
+        
+        # 视频是输入 0
+        for i, scene in enumerate(scenes):
+            audio_path = scene.get("audio_path")
+            if not audio_path:
+                continue
+                
+            ffmpeg_cmd.extend(["-i", str(audio_path)])
+            input_idx = len(amix_inputs) + 1 # 1-based audio inputs
+            # index.html 中片头占了3秒，所以每个音频要延迟 start_time + 3 秒
+            delay_ms = int((scene.get("start_time", 0) + 3.0) * 1000)
+            
+            # adelay expects delay in ms
+            filter_complex.append(f"[{input_idx}:a]adelay={delay_ms}|{delay_ms}[a{input_idx}]")
+            amix_inputs.append(f"[a{input_idx}]")
+            
+        if amix_inputs:
+            inputs_str = "".join(amix_inputs)
+            # amix defaults to 2 inputs, must specify inputs=N
+            filter_complex.append(f"{inputs_str}amix=inputs={len(amix_inputs)}:duration=longest[aout]")
+            ffmpeg_cmd.extend(["-filter_complex", ";".join(filter_complex)])
+            ffmpeg_cmd.extend(["-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", str(final_output)])
+            
+            try:
+                subprocess.run(ffmpeg_cmd, check=True, capture_output=True, text=True, encoding="utf-8")
+                logger.info(f"Muxing completed: {final_output}")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"FFmpeg muxing failed: {e.stderr}")
+                logger.info(f"Fallback to copying visual-only video to {final_output}")
+                shutil.copy2(output_mp4, final_output)
+        else:
+            shutil.copy2(output_mp4, final_output)
+        
         return RenderResult(
             video_path=final_output,
-            duration_sec=0.0, # TODO: 从 data 或输出中读取
+            duration_sec=serialized_data.get("total_duration", 0) + 3.0,
             resolution="1920x1080"
         )
