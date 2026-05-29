@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import yaml
+from dotenv import load_dotenv
 
 _ENV_VAR_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
@@ -31,6 +32,11 @@ def _resolve_recursive(obj: dict | list | str) -> dict | list | str:
 def load_config(config_path: str | Path | None = None) -> dict:
     """加载配置文件。优先加载 config.local.yaml，回退到 config.yaml。"""
     project_root = Path(__file__).resolve().parent.parent
+    
+    # 强制加载项目根目录的 .env 文件
+    env_path = project_root / ".env"
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path)
 
     if config_path:
         path = Path(config_path)

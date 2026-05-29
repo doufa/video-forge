@@ -5,9 +5,9 @@ skills:
   script_writer:
     provider: deepseek_rag
     llm:
-      base_url: "https://api.siliconflow.cn/v1"  # 硅基流动
-      model: "deepseek-ai/DeepSeek-V3"
-      api_key: "${SILICONFLOW_API_KEY}"           # 从环境变量读取
+      base_url: "${SCRIPT_LLM_BASE_URL}"
+      model: "${SCRIPT_LLM_MODEL}"
+      api_key: "${SCRIPT_LLM_API_KEY}"
 
   tts_generate:
     provider: edge_tts
@@ -41,7 +41,7 @@ skills:
       frames_per_scene: 3       # 首/中/尾三帧
     gemini:
       model: "gemini-2.0-flash"
-      api_key: "${GEMINI_API_KEY}"
+      api_key: "${VISION_LLM_API_KEY}"
 
   video_render:
     provider: hyperframes
@@ -63,7 +63,7 @@ skills:
       max_offset_sec: 0.5
     gemini:
       model: "gemini-2.0-flash"
-      api_key: "${GEMINI_API_KEY}"
+      api_key: "${VISION_LLM_API_KEY}"
 
 paths:
   assets_dir: "./assets"
