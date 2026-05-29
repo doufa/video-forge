@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# Node / HyperFrames
+node_modules/
+package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project
+output/*
+!output/.gitkeep
+assets/*
+!assets/.gitkeep
+*.mp4
+*.mp3
+*.wav
+
+# Secrets
+.env
+config.local.yaml

@@ -1,0 +1,1 @@
+from videoforge.skills.asset_search.local_faiss import LocalFAISSProvider

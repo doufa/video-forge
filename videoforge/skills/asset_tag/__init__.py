@@ -1,0 +1,1 @@
+from videoforge.skills.asset_tag.clip_gemini import CLIPGeminiProvider

@@ -1,0 +1,72 @@
+# VideoForge 默认配置
+# 复制为 config.local.yaml 并修改，config.local.yaml 会覆盖此文件且不会被 git 追踪
+
+skills:
+  script_writer:
+    provider: deepseek_rag
+    llm:
+      base_url: "https://api.siliconflow.cn/v1"  # 硅基流动
+      model: "deepseek-ai/DeepSeek-V3"
+      api_key: "${SILICONFLOW_API_KEY}"           # 从环境变量读取
+
+  tts_generate:
+    provider: edge_tts
+    edge_tts:
+      voice: "zh-CN-YunxiNeural"
+    # cosyvoice:
+    #   model_dir: "./models/cosyvoice"
+    # elevenlabs:
+    #   api_key: "${ELEVENLABS_API_KEY}"
+    #   voice_id: "your-voice-id"
+
+  timestamp_align:
+    provider: whisperx
+    whisperx:
+      model_size: "base"
+      language: "zh"
+
+  asset_search:
+    provider: local_faiss
+    local_faiss:
+      index_path: "./data/faiss_index"
+      top_k: 5
+    fallback: youtube_dl
+    youtube_dl:
+      max_results: 3
+
+  asset_tag:
+    provider: clip_gemini
+    clip:
+      model: "ViT-B/32"
+      frames_per_scene: 3       # 首/中/尾三帧
+    gemini:
+      model: "gemini-2.0-flash"
+      api_key: "${GEMINI_API_KEY}"
+
+  video_render:
+    provider: hyperframes
+    hyperframes:
+      template_dir: "./templates/hyperframes"
+      fps: 30
+      resolution: "1920x1080"
+
+  subtitle_export:
+    provider: srt
+
+  qa_check:
+    provider: multi_level
+    ffprobe:
+      black_threshold: 0.98
+      silence_threshold: -50     # dB
+    whisper:
+      model_size: "base"
+      max_offset_sec: 0.5
+    gemini:
+      model: "gemini-2.0-flash"
+      api_key: "${GEMINI_API_KEY}"
+
+paths:
+  assets_dir: "./assets"
+  output_dir: "./output"
+  data_dir: "./data"
+  templates_dir: "./templates"

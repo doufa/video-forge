@@ -1,0 +1,49 @@
+[project]
+name = "videoforge"
+version = "0.1.0"
+description = "知识科普视频自动化生产系统 - 真实素材智能检索与组合"
+requires-python = ">=3.11"
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Phase 2: 编剧 + 配音
+phase2 = [
+    "yt-dlp>=2024.0",
+    "faiss-cpu>=1.7",
+    "openai>=1.0",          # LLM API 调用 (兼容硅基流动等 OpenAI-compatible API)
+    "edge-tts>=6.1",
+    # "whisperx",            # 需从 GitHub 安装
+]
+# Phase 3: 素材打标
+phase3 = [
+    "scenedetect[opencv]>=0.6",
+    "clip @ git+https://github.com/openai/CLIP.git",
+    "Pillow>=10.0",
+]
+# Phase 4: Web UI 后端
+phase4 = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "websockets>=12.0",
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["videoforge*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
