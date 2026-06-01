@@ -6,6 +6,8 @@ Usage:
     python -m videoforge.cli list          # 列出素材
     python -m videoforge.cli tag           # 为素材生成 CLIP 向量
     python -m videoforge.cli search        # 搜索素材
+    python -m videoforge.cli dedup         # 查找/删除重复素材
+    python -m videoforge.cli template      # 管理叙事模板
 """
 
 from __future__ import annotations
@@ -243,6 +245,114 @@ def cmd_search(args):
         print()
 
 
+def cmd_dedup(args):
+    """查找和删除重复素材"""
+    from videoforge.storage.dedup import deduplicate_assets
+
+    method = args.method
+    dry_run = not args.execute
+    threshold = args.threshold
+
+    print(f"Finding duplicates using {method} method...")
+    if dry_run:
+        print("(Dry run - no files will be deleted)\n")
+
+    result = deduplicate_assets(
+        method=method,
+        threshold=threshold,
+        dry_run=dry_run,
+    )
+
+    if result["groups"] == 0:
+        print("No duplicates found!")
+        return
+
+    print(f"Found {result['duplicates']} duplicates in {result['groups']} groups")
+    print(f"Space that can be freed: {format_size(result['freed_bytes'])}\n")
+
+    if dry_run and result["details"]:
+        print("Duplicate groups:")
+        for i, group in enumerate(result["details"][:10], 1):
+            print(f"\n  Group {i}: {group.original_path}")
+            for dup_id, dup_path, sim in group.duplicates:
+                print(f"    - {dup_path} (similarity: {sim:.2%})")
+
+        if len(result["details"]) > 10:
+            print(f"\n  ... and {len(result['details']) - 10} more groups")
+
+        print("\nRun with --execute to remove duplicates")
+    elif not dry_run:
+        print(f"Removed {result['duplicates']} duplicate files")
+
+
+def cmd_template(args):
+    """管理叙事模板"""
+    from videoforge.skills.rag_template import TemplateExtractor
+    from videoforge.config import load_config
+
+    config = load_config()
+    extractor = TemplateExtractor(config)
+
+    if args.action == "list":
+        templates = extractor.list_templates(args.domain)
+        if not templates:
+            print("No templates found")
+            return
+
+        print(f"Found {len(templates)} templates:\n")
+        for t in templates:
+            print(f"  [{t.id}] {t.topic_domain}")
+            print(f"      Channel: {t.source_channel or 'N/A'}")
+            print(f"      Techniques: {', '.join(t.techniques[:3])}")
+            print(f"      Structure: {len(t.structure)} parts")
+            print()
+
+    elif args.action == "extract":
+        if not args.url:
+            print("Please provide a YouTube URL with --url")
+            return
+
+        print(f"Extracting template from: {args.url}")
+        template = extractor.extract_from_url(args.url, channel=args.channel or "")
+
+        if not template:
+            print("Failed to extract template")
+            return
+
+        print(f"\nExtracted template:")
+        print(f"  Domain: {template.topic_domain}")
+        print(f"  Techniques: {', '.join(template.techniques)}")
+        print(f"  Structure ({len(template.structure)} parts):")
+        for part in template.structure:
+            print(f"    - [{part['type']}] {part['description'][:50]}...")
+
+        if args.save:
+            template_id = extractor.save_template(template)
+            print(f"\nSaved as template ID: {template_id}")
+        else:
+            print("\nUse --save to save this template")
+
+    elif args.action == "show":
+        if not args.id:
+            print("Please provide a template ID with --id")
+            return
+
+        template = extractor.get_template(args.id)
+        if not template:
+            print(f"Template {args.id} not found")
+            return
+
+        print(f"Template {template.id}:")
+        print(f"  Domain: {template.topic_domain}")
+        print(f"  Channel: {template.source_channel or 'N/A'}")
+        print(f"  URL: {template.source_url or 'N/A'}")
+        print(f"  Techniques: {', '.join(template.techniques)}")
+        print(f"  Style: {template.style_notes}")
+        print(f"\n  Structure:")
+        for i, part in enumerate(template.structure, 1):
+            print(f"    {i}. [{part['type']}] {part['description']}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="VideoForge CLI",
@@ -277,6 +387,27 @@ def main():
     parser_search.add_argument("query", nargs="+", help="Search query")
     parser_search.add_argument("--limit", type=int, default=5, help="Max results")
     parser_search.set_defaults(func=cmd_search)
+
+    # dedup
+    parser_dedup = subparsers.add_parser("dedup", help="Find and remove duplicate assets")
+    parser_dedup.add_argument("--method", choices=["hash", "visual"], default="hash",
+                              help="Deduplication method (default: hash)")
+    parser_dedup.add_argument("--threshold", type=float, default=0.95,
+                              help="Visual similarity threshold (default: 0.95)")
+    parser_dedup.add_argument("--execute", action="store_true",
+                              help="Actually delete duplicates (default: dry run)")
+    parser_dedup.set_defaults(func=cmd_dedup)
+
+    # template
+    parser_template = subparsers.add_parser("template", help="Manage narrative templates")
+    parser_template.add_argument("action", choices=["list", "extract", "show"],
+                                 help="Action to perform")
+    parser_template.add_argument("--url", help="YouTube URL for extraction")
+    parser_template.add_argument("--channel", help="Channel name for extraction")
+    parser_template.add_argument("--save", action="store_true", help="Save extracted template")
+    parser_template.add_argument("--id", type=int, help="Template ID for show")
+    parser_template.add_argument("--domain", help="Filter by topic domain")
+    parser_template.set_defaults(func=cmd_template)
 
     args = parser.parse_args()
 

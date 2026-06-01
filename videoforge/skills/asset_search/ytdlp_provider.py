@@ -9,6 +9,7 @@ from pathlib import Path
 
 from videoforge.models import AssetResult
 from videoforge.skills.base import AssetSearchSkill
+from videoforge.storage import Asset, Database
 from videoforge.storage.sidecar import AssetMetadata, read_sidecar, write_sidecar
 from videoforge.utils.paths import get_relative_path
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class YTDLPSearchProvider(AssetSearchSkill):
-    """基于 yt-dlp 的 YouTube B-roll 检索与下载，自带本地缓存和元数据 sidecar"""
+    """基于 yt-dlp 的 YouTube B-roll 检索与下载，自带本地缓存、元数据 sidecar 和数据库入库"""
 
     def __init__(self, config: dict):
         self.config = config.get("ytdlp", {})
@@ -62,11 +63,13 @@ class YTDLPSearchProvider(AssetSearchSkill):
 
     def _write_metadata(
         self, target_file: Path, query: str, video_info: dict | None
-    ) -> None:
-        """写入 sidecar 元数据"""
+    ) -> AssetMetadata:
+        """写入 sidecar 元数据并返回"""
         original_url = ""
         duration_sec = None
         resolution = ""
+        width = None
+        height = None
 
         if video_info:
             original_url = video_info.get("webpage_url", "")
@@ -91,6 +94,49 @@ class YTDLPSearchProvider(AssetSearchSkill):
         )
         write_sidecar(target_file, metadata)
         logger.debug(f"Wrote sidecar metadata for {target_file}")
+        return metadata
+
+    def _ingest_to_database(
+        self, target_file: Path, metadata: AssetMetadata, video_info: dict | None
+    ) -> int | None:
+        """将素材入库到数据库"""
+        rel_path = get_relative_path(target_file)
+
+        width = None
+        height = None
+        if video_info:
+            width = video_info.get("width")
+            height = video_info.get("height")
+
+        try:
+            with Database() as db:
+                existing = db.get_asset_by_path(rel_path)
+                if existing:
+                    logger.debug(f"Asset already in database: {rel_path}")
+                    return existing.id
+
+                asset = Asset(
+                    path=rel_path,
+                    asset_type="video",
+                    source="youtube",
+                    original_query=metadata.original_query,
+                    original_url=metadata.original_url,
+                    filename_original=target_file.name,
+                    description=metadata.description,
+                    tags=metadata.tags,
+                    duration_sec=metadata.duration_sec,
+                    width=width,
+                    height=height,
+                    file_size=metadata.file_size,
+                    reviewed=False,
+                )
+                asset_id = db.add_asset(asset)
+                logger.info(f"Ingested asset to database: {rel_path} (ID: {asset_id})")
+                return asset_id
+
+        except Exception as e:
+            logger.error(f"Failed to ingest asset to database: {e}")
+            return None
 
     def _extract_tags(self, query: str) -> list[str]:
         """从搜索词提取标签"""
@@ -155,7 +201,8 @@ class YTDLPSearchProvider(AssetSearchSkill):
             )
             if target_file.exists():
                 logger.info(f"Successfully downloaded: {target_file}")
-                self._write_metadata(target_file, query, video_info)
+                metadata = self._write_metadata(target_file, query, video_info)
+                self._ingest_to_database(target_file, metadata, video_info)
                 return [
                     AssetResult(
                         asset_path=target_file,
