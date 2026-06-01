@@ -9,13 +9,16 @@ from videoforge.storage.sidecar import (
     update_sidecar,
     write_sidecar,
 )
+from videoforge.storage.vector_store import VectorStore, get_vector_store
 
 __all__ = [
     "Asset",
     "AssetMetadata",
     "Database",
+    "VectorStore",
     "delete_sidecar",
     "get_sidecar_path",
+    "get_vector_store",
     "init_db",
     "read_sidecar",
     "update_sidecar",

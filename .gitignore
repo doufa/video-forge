@@ -49,4 +49,4 @@ config.local.yaml
 # Database and index files
 data/videoforge.db
 data/faiss_index.bin
-data/faiss_id_map.json
+data/faiss_index.json
