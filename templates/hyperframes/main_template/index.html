@@ -26,13 +26,13 @@
         height: 100%;
       }
 
-      .scene {
+      .media-wrapper {
         position: absolute;
         top: 0; left: 0;
         width: 100%;
         height: 100%;
-        display: none; /* hidden by default, gsap handles visibility */
         overflow: hidden;
+        z-index: 1;
       }
 
       .bg-media {
@@ -41,29 +41,34 @@
         width: 100%;
         height: 100%;
         object-fit: cover;
-        z-index: 1;
         filter: brightness(0.6);
       }
 
       .subtitle-container {
         position: absolute;
-        bottom: 10%;
+        bottom: 8%;
+        left: 10%;
+        right: 10%;
+        min-height: 120px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 20px;
+        z-index: 10;
+      }
+      
+      .subtitle-text {
+        position: absolute;
+        top: 50%;
         left: 0;
         width: 100%;
-        text-align: center;
-        z-index: 10;
-        padding: 0 100px;
-      }
-
-      .subtitle-text {
-        font-size: 80px;
-        color: #fff;
+        transform: translateY(-50%);
+        margin: 0;
+        padding: 0 40px;
+        box-sizing: border-box;
+        font-size: 3em;
         font-weight: bold;
-        text-shadow: 0 4px 12px rgba(0,0,0,0.8), 0 0 4px rgba(0,0,0,0.5);
-        background: rgba(0, 0, 0, 0.4);
-        padding: 10px 30px;
-        border-radius: 20px;
-        display: inline-block;
+        color: white;
+        text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
+        text-align: center;
       }
       
       .title-screen {
@@ -97,94 +102,103 @@
 
     <script>
       const data = window.__VIDEOFORGE_DATA__ || { title: "Title", scenes: [], total_duration: 5 };
-      document.getElementById('root').setAttribute('data-duration', data.total_duration + 3); // 留3秒片头
+      const totalDuration = data.total_duration + 3; // 留3秒片头
+      document.getElementById('root').setAttribute('data-duration', totalDuration);
 
       const root = document.getElementById('root');
       
-      // 1. 生成片头
+      // 1. 生成片头 — 作为 HyperFrames clip
       const titleScreen = document.createElement('div');
-      titleScreen.className = 'title-screen';
+      titleScreen.className = 'title-screen clip';
       titleScreen.id = 'title-screen';
+      titleScreen.setAttribute('data-start', '0');
+      titleScreen.setAttribute('data-duration', '3');
+      titleScreen.setAttribute('data-track-index', '10');
       titleScreen.innerText = data.title;
       root.appendChild(titleScreen);
 
-      // 2. 生成各个 Scene
+      // 2. 创建唯一的 Master Video 元素 (使用 H.264 MP4 格式以提升渲染性能)
+      const videoWrapper = document.createElement('div');
+      videoWrapper.className = 'media-wrapper clip';
+      videoWrapper.id = 'video-wrapper';
+      videoWrapper.setAttribute('data-start', '3.0');
+      videoWrapper.setAttribute('data-duration', String(data.total_duration));
+      videoWrapper.setAttribute('data-track-index', '0');
+
+      const video = document.createElement('video');
+      video.className = 'bg-media';
+      video.src = 'assets/concat_master.mp4';
+      video.muted = true;
+      video.preload = 'auto'; // 单个视频可以安全开启预加载，消除首次加载延迟
+      video.setAttribute('playsinline', '');
+      video.setAttribute('data-start', '3.0');
+      video.setAttribute('data-duration', String(data.total_duration));
+      video.setAttribute('data-track-index', '0');
+      videoWrapper.appendChild(video);
+      root.appendChild(videoWrapper);
+
+      // 3. 生成各个 Scene 的字幕元素
+      let current_time = 3.0; // 视频内容从第3秒开始
+
       data.scenes.forEach(scene => {
-        const sceneDiv = document.createElement('div');
-        sceneDiv.className = 'scene';
-        sceneDiv.id = `scene-${scene.index}`;
-        
-        // 背景素材
-        if (scene.asset_path) {
-          const isVideo = scene.asset_path.toLowerCase().endsWith('.mp4');
-          if (isVideo) {
-            const video = document.createElement('video');
-            video.className = 'bg-media';
-            video.src = 'file:///' + scene.asset_path;
-            video.loop = true;
-            video.muted = true;
-            // object fit cover
-            sceneDiv.appendChild(video);
-          } else {
-            const img = document.createElement('img');
-            img.className = 'bg-media';
-            img.src = 'file:///' + scene.asset_path;
-            sceneDiv.appendChild(img);
-          }
+        // 字幕容器 — 作为 clip
+        if (scene.words && scene.words.length > 0) {
+          const subContainer = document.createElement('div');
+          subContainer.className = 'subtitle-container clip';
+          subContainer.id = `sub-container-${scene.index}`;
+          subContainer.setAttribute('data-start', String(current_time));
+          subContainer.setAttribute('data-duration', String(scene.duration));
+          subContainer.setAttribute('data-track-index', '2');
+          
+          scene.words.forEach((wordObj, wIdx) => {
+            const p = document.createElement('p');
+            p.className = 'subtitle-text';
+            p.textContent = wordObj.word;
+            p.id = `word-${scene.index}-${wIdx}`;
+            p.style.opacity = '0';
+            subContainer.appendChild(p);
+          });
+          root.appendChild(subContainer);
         }
 
-        // 字幕
-        const subContainer = document.createElement('div');
-        subContainer.className = 'subtitle-container';
-        const subText = document.createElement('div');
-        subText.className = 'subtitle-text';
-        subText.id = `sub-${scene.index}`;
-        subText.innerText = scene.narration;
-        subContainer.appendChild(subText);
-        sceneDiv.appendChild(subContainer);
-
-        root.appendChild(sceneDiv);
+        current_time += scene.duration;
       });
 
-      // 3. 构建 GSAP 时间轴
+      // 4. 构建 GSAP 时间轴 — 仅做纯动画效果，不控制显隐
       window.__timelines = window.__timelines || {};
       const tl = gsap.timeline({ paused: true });
 
+      // 强制让 GSAP 时间轴长度与总时长对齐，防止黑帧
+      tl.to({}, { duration: totalDuration }, 0);
+
       // 片头动画 (0~3秒)
-      tl.set('#title-screen', { display: 'flex' }, 0);
       tl.from('#title-screen', { opacity: 0, scale: 0.8, duration: 1 }, 0);
       tl.to('#title-screen', { opacity: 0, scale: 1.2, duration: 1 }, 2);
-      tl.set('#title-screen', { display: 'none' }, 3);
 
-      let current_time = 3.0; // 视频内容从第3秒开始
+      // 场景动画
+      let anim_time = 3.0;
 
-      data.scenes.forEach((scene, i) => {
-        const sceneSelector = `#scene-${scene.index}`;
-        
-        // 显示当前场景
-        tl.set(sceneSelector, { display: 'block' }, current_time);
-        
-        // 如果是视频，可以通过 GSAP 调用播放
-        // tl.call(() => {
-        //   const video = document.querySelector(`${sceneSelector} video`);
-        //   if (video) video.play();
-        // }, null, current_time);
-        
-        // 背景轻微放大效果 (Ken Burns)
-        tl.fromTo(`${sceneSelector} .bg-media`, 
+      data.scenes.forEach(scene => {
+        // 动画作用在唯一的背景容器 #video-wrapper 上，逐场景进行缩放动画
+        tl.fromTo('#video-wrapper', 
           { scale: 1.0 }, 
-          { scale: 1.1, duration: scene.duration, ease: "none" }, 
-          current_time
+          { scale: 1.15, duration: scene.duration, ease: "none" }, 
+          anim_time
         );
 
-        // 字幕弹入
-        tl.from(`${sceneSelector} .subtitle-text`, {
-          y: 50, opacity: 0, duration: 0.5, ease: "power2.out"
-        }, current_time);
+        // 字幕淡入淡出动画
+        if (scene.words && scene.words.length > 0) {
+          scene.words.forEach((wordObj, wIdx) => {
+            const absoluteStart = anim_time + wordObj.start;
+            const absoluteEnd = anim_time + wordObj.end;
+            const pId = `#word-${scene.index}-${wIdx}`;
+            
+            tl.to(pId, { opacity: 1, duration: 0.15 }, absoluteStart);
+            tl.to(pId, { opacity: 0, duration: 0.15 }, absoluteEnd);
+          });
+        }
         
-        // 当前场景结束隐藏
-        current_time += scene.duration;
-        tl.set(sceneSelector, { display: 'none' }, current_time);
+        anim_time += scene.duration;
       });
 
       window.__timelines["main"] = tl;

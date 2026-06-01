@@ -118,14 +118,13 @@ class PipelineRunner:
             if ts.words:
                 scene_duration = ts.words[-1].end_sec + 0.5 # 留半秒余量
             
-            asset_path = str(assets[0].asset_path) if assets else ""
-            # 将 Windows 路径转换为浏览器可读的正斜杠形式
-            asset_path = asset_path.replace("\\", "/")
-            audio_path = str(tts.audio_path).replace("\\", "/")
-            
             # 格式化时间戳，给字幕引擎使用
             words_data = [{"word": w.word, "start": w.start_sec, "end": w.end_sec} for w in ts.words]
-            
+
+            # 构建路径（使用正斜杠，兼容 HyperFrames 的 file:// 协议）
+            asset_path = str(assets[0].asset_path).replace("\\", "/") if assets else "fallback.jpg"
+            audio_path = str(tts.audio_path).replace("\\", "/") if tts else ""
+
             scene_data = {
                 "index": scene.index,
                 "narration": scene.narration,

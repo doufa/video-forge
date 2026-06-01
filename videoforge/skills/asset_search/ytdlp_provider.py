@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 from videoforge.models import AssetResult
@@ -49,8 +50,9 @@ class YTDLPSearchProvider(AssetSearchSkill):
             return [AssetResult(asset_path=self.fallback_asset, score=0.0, source="fallback", asset_type="image")]
             
         slug = self._slugify(query)
-        # 为了兼容性，使用 .mp4 后缀
-        target_file = self.assets_dir / f"{slug}.mp4"
+        # 使用 mp4 格式，兼容性更好
+        safe_query = re.sub(r'[^\w\-_\. ]', '_', query)
+        target_file = Path(self.assets_dir) / f"{safe_query}.mp4"
 
         # 检查本地缓存
         if target_file.exists():
@@ -65,20 +67,19 @@ class YTDLPSearchProvider(AssetSearchSkill):
             
         logger.info(f"Downloading yt-dlp asset for query '{query}'...")
         # 调用 yt-dlp
-        # format: 取最差画质/或限定高度 720p 以下，避免下载太慢
-        # ytsearch1: 搜索并下载第一个结果
+        # 格式选择：优先 webm，fallback 到 mp4，确保大多数视频都能下载
         cmd = [
-            "yt-dlp",
+            sys.executable, "-m", "yt_dlp",
             f"ytsearch1:{query}",
-            "-f", "worstvideo[ext=mp4]+worstaudio[ext=m4a]/worst[ext=mp4]/worst",
+            "-f", "bestvideo[height<=1080][ext=mp4]/bestvideo[height<=1080][ext=webm]/best[height<=1080]/best",
             "-o", str(target_file),
             "--no-playlist",
-            "--max-downloads", "1"
+            "--merge-output-format", "mp4"  # 确保输出为 mp4 格式
         ]
 
         try:
-            # timeout 避免一直卡住
-            subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=60, encoding="utf-8")
+            # timeout 避免一直卡住，设为 180 秒以适应 1080p 视频下载
+            subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=180, encoding="utf-8")
             if target_file.exists():
                 logger.info(f"Successfully downloaded: {target_file}")
                 return [AssetResult(

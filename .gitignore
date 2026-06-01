@@ -30,9 +30,17 @@ output/*
 !output/.gitkeep
 assets/*
 !assets/.gitkeep
+
+# Template assets (downloaded videos, generated concat files)
+templates/hyperframes/*/assets/
+templates/hyperframes/*/renders/
+templates/hyperframes/*/data.js
+
+# Media files
 *.mp4
 *.mp3
 *.wav
+*.webm
 
 # Secrets
 .env
