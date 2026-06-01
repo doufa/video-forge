@@ -126,10 +126,11 @@
       videoWrapper.setAttribute('data-track-index', '0');
 
       const video = document.createElement('video');
-      video.className = 'bg-media';
+      video.className = 'bg-media clip';
+      video.id = 'bg-video';
       video.src = 'assets/concat_master.mp4';
       video.muted = true;
-      video.preload = 'auto'; // 单个视频可以安全开启预加载，消除首次加载延迟
+      video.preload = 'auto';
       video.setAttribute('playsinline', '');
       video.setAttribute('data-start', '3.0');
       video.setAttribute('data-duration', String(data.total_duration));
