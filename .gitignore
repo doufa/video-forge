@@ -45,3 +45,8 @@ templates/hyperframes/*/data.js
 # Secrets
 .env
 config.local.yaml
+
+# Database and index files
+data/videoforge.db
+data/faiss_index.bin
+data/faiss_id_map.json

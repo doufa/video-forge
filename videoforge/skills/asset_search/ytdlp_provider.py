@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
 import subprocess
@@ -8,29 +9,26 @@ from pathlib import Path
 
 from videoforge.models import AssetResult
 from videoforge.skills.base import AssetSearchSkill
+from videoforge.storage.sidecar import AssetMetadata, read_sidecar, write_sidecar
+from videoforge.utils.paths import get_relative_path
 
 logger = logging.getLogger(__name__)
 
+
 class YTDLPSearchProvider(AssetSearchSkill):
-    """基于 yt-dlp 的 YouTube B-roll 检索与下载，自带本地缓存"""
+    """基于 yt-dlp 的 YouTube B-roll 检索与下载，自带本地缓存和元数据 sidecar"""
 
     def __init__(self, config: dict):
         self.config = config.get("ytdlp", {})
         self.assets_dir = Path("output/assets")
         self.assets_dir.mkdir(parents=True, exist_ok=True)
-        # 默认使用通用 fallback 图片/视频
         self.fallback_asset = self.assets_dir / "fallback.jpg"
         self._ensure_fallback_asset()
 
     def _ensure_fallback_asset(self):
         """确保存在一个兜底的本地素材"""
         if not self.fallback_asset.exists():
-            # 这里简单生成一个纯色黑底图作为后备（需要 ffmpeg 或者 simply mock a fake file, but a real file is better for HyperFrames if needed. 
-            # 实际上由于 HyperFrames 是 Web 引擎，任何存在的 jpg 都可以作为占位。）
-            # 我们用 python 写入一个极其简单的纯色 BMP 图片，改为 .jpg 结尾即可欺骗一些简单的检查，或者使用 base64 写入真实的小图片。
-            # 为了简单起见，我们生成一个极简的 1x1 黑色 JPEG。
             logger.info("Creating fallback black image...")
-            # 1x1 black JPEG hex
             black_jpg = bytes.fromhex(
                 "ffd8ffe000104a46494600010101004800480000ffdb004300080606070605080707070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c1c2837292c30313434341f27393d38323c2e333432ffdb0043010909090c0b0c180d0d1832211c213232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232ffc00011080001000103012200021101031101ffc4001f0000010501010101010100000000000000000102030405060708090a0bffc400b5100002010303020403050504040000017d01020300041105122131410613516107227114328191a1082342b1c11552d1f02433627282090a161718191a25262728292a3435363738393a434445464748494a535455565758595a636465666768696a737475767778797a838485868788898a92939495969798999aa2a3a4a5a6a7a8a9aab2b3b4b5b6b7b8b9bac2c3c4c5c6c7c8c9cad2d3d4d5d6d7d8d9dae1e2e3e4e5e6e7e8e9eaf1f2f3f4f5f6f7f8f9faffc4001f0100030101010101010101010000000000000102030405060708090a0bffc400b51100020102040403040705040400010277000102031104052131061241510761711322328108144291a1b1c109233352f0156272d10a162434e125f11718191a262728292a35363738393a434445464748494a535455565758595a636465666768696a737475767778797a838485868788898a92939495969798999aa2a3a4a5a6a7a8a9aab2b3b4b5b6b7b8b9bac2c3c4c5c6c7c8c9cad2d3d4d5d6d7d8d9dae2e3e4e5e6e7e8e9eaf2f3f4f5f6f7f8f9faffda000c03010002110311003f00f9fe8a28a00f"
             )
@@ -39,58 +37,144 @@ class YTDLPSearchProvider(AssetSearchSkill):
     def _slugify(self, text: str) -> str:
         """将搜索词转为合法的文件名"""
         text = text.lower()
-        text = re.sub(r'[^a-z0-9]+', '_', text)
-        return text.strip('_')
+        text = re.sub(r"[^a-z0-9]+", "_", text)
+        return text.strip("_")
+
+    def _get_video_info(self, query: str) -> dict | None:
+        """获取视频元信息（不下载）"""
+        cmd = [
+            sys.executable,
+            "-m",
+            "yt_dlp",
+            f"ytsearch1:{query}",
+            "--dump-json",
+            "--no-download",
+        ]
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=30, encoding="utf-8"
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return json.loads(result.stdout)
+        except Exception as e:
+            logger.debug(f"Failed to get video info: {e}")
+        return None
+
+    def _write_metadata(
+        self, target_file: Path, query: str, video_info: dict | None
+    ) -> None:
+        """写入 sidecar 元数据"""
+        original_url = ""
+        duration_sec = None
+        resolution = ""
+
+        if video_info:
+            original_url = video_info.get("webpage_url", "")
+            duration_sec = video_info.get("duration")
+            width = video_info.get("width")
+            height = video_info.get("height")
+            if width and height:
+                resolution = f"{width}x{height}"
+
+        file_size = target_file.stat().st_size if target_file.exists() else None
+
+        metadata = AssetMetadata(
+            source="youtube",
+            original_query=query,
+            original_url=original_url,
+            description=f"YouTube search result for: {query}",
+            tags=self._extract_tags(query),
+            duration_sec=duration_sec,
+            resolution=resolution,
+            file_size=file_size,
+            reviewed=False,
+        )
+        write_sidecar(target_file, metadata)
+        logger.debug(f"Wrote sidecar metadata for {target_file}")
+
+    def _extract_tags(self, query: str) -> list[str]:
+        """从搜索词提取标签"""
+        words = re.split(r"[\s,]+", query.lower())
+        tags = [w.strip() for w in words if len(w.strip()) > 2]
+        return list(dict.fromkeys(tags))[:10]
 
     def search(self, query: str, top_k: int = 1, **kwargs) -> list[AssetResult]:
-        """
-        利用 yt-dlp 搜索 YouTube 并在本地缓存。
-        """
+        """利用 yt-dlp 搜索 YouTube 并在本地缓存"""
         if not query.strip():
-            return [AssetResult(asset_path=self.fallback_asset, score=0.0, source="fallback", asset_type="image")]
-            
-        slug = self._slugify(query)
-        # 使用 mp4 格式，兼容性更好
-        safe_query = re.sub(r'[^\w\-_\. ]', '_', query)
+            return [
+                AssetResult(
+                    asset_path=self.fallback_asset,
+                    score=0.0,
+                    source="fallback",
+                    asset_type="image",
+                )
+            ]
+
+        safe_query = re.sub(r"[^\w\-_\. ]", "_", query)
         target_file = Path(self.assets_dir) / f"{safe_query}.mp4"
 
-        # 检查本地缓存
         if target_file.exists():
             logger.info(f"Using cached asset for query '{query}': {target_file}")
-            return [AssetResult(
-                asset_path=target_file,
-                score=1.0,
-                source="local_cache",
-                description=query,
-                asset_type="video"
-            )]
-            
+            metadata = read_sidecar(target_file)
+            return [
+                AssetResult(
+                    asset_path=target_file,
+                    score=1.0,
+                    source="local_cache",
+                    description=metadata.description if metadata else query,
+                    asset_type="video",
+                )
+            ]
+
         logger.info(f"Downloading yt-dlp asset for query '{query}'...")
-        # 调用 yt-dlp
-        # 格式选择：优先 webm，fallback 到 mp4，确保大多数视频都能下载
+
+        video_info = self._get_video_info(query)
+
         cmd = [
-            sys.executable, "-m", "yt_dlp",
+            sys.executable,
+            "-m",
+            "yt_dlp",
             f"ytsearch1:{query}",
-            "-f", "bestvideo[height<=1080][ext=mp4]/bestvideo[height<=1080][ext=webm]/best[height<=1080]/best",
-            "-o", str(target_file),
+            "-f",
+            "bestvideo[height<=1080][ext=mp4]/bestvideo[height<=1080][ext=webm]/best[height<=1080]/best",
+            "-o",
+            str(target_file),
             "--no-playlist",
-            "--merge-output-format", "mp4"  # 确保输出为 mp4 格式
+            "--merge-output-format",
+            "mp4",
         ]
 
         try:
-            # timeout 避免一直卡住，设为 180 秒以适应 1080p 视频下载
-            subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=180, encoding="utf-8")
+            subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=180,
+                encoding="utf-8",
+            )
             if target_file.exists():
                 logger.info(f"Successfully downloaded: {target_file}")
-                return [AssetResult(
-                    asset_path=target_file,
-                    score=1.0,
-                    source="youtube",
-                    description=query,
-                    asset_type="video"
-                )]
+                self._write_metadata(target_file, query, video_info)
+                return [
+                    AssetResult(
+                        asset_path=target_file,
+                        score=1.0,
+                        source="youtube",
+                        description=query,
+                        asset_type="video",
+                    )
+                ]
         except Exception as e:
-            logger.warning(f"Failed to download asset for query '{query}': {e}. Using fallback.")
-            
-        # 降级返回 fallback
-        return [AssetResult(asset_path=self.fallback_asset, score=0.0, source="fallback", asset_type="image")]
+            logger.warning(
+                f"Failed to download asset for query '{query}': {e}. Using fallback."
+            )
+
+        return [
+            AssetResult(
+                asset_path=self.fallback_asset,
+                score=0.0,
+                source="fallback",
+                asset_type="image",
+            )
+        ]
