@@ -33,7 +33,12 @@ npx hyperframes preview templates/hyperframes/demo.html
 
 ## 文档
 
-- [方案设计（定稿版）](docs/design.md)
+- [Demo 使用指南](docs/demo_guide.md) ⭐ 快速上手
+- [方案设计（开工版）](VideoForge：知识科普视频自动化生产系统方案设计%20(开工版).md)
+- [开发路线图 (Roadmap)](docs/roadmap.md)
+- [优化待办清单](docs/optimization_backlog.md)
+- [Phase 1-2 分析与设计](docs/phase1_2_design.md)
+- [Phase 3-4 实施计划](docs/phase3_4_implementation_plan.md)
 
 ## License
 
