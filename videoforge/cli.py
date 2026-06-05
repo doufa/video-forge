@@ -353,6 +353,74 @@ def cmd_template(args):
             print(f"    {i}. [{part['type']}] {part['description']}")
 
 
+def cmd_ingest_url(args):
+    """Ingest a video from URL into the resource library."""
+    from videoforge.resource_library.indexer import ResourceIndexer
+
+    indexer = ResourceIndexer()
+    result = indexer.ingest_url(args.url)
+
+    print(f"Ingested: {args.url}")
+    print(f"  Asset ID: {result.asset_id}")
+    print(f"  Path: {result.asset_path}")
+    print(f"  Segments: {result.segments_created}")
+    print(f"  Transcripts: {result.transcripts_created}")
+    print(f"  Visual vectors: {result.visual_vectors}")
+    print(f"  Text vectors: {result.text_vectors}")
+
+
+def cmd_ingest_local(args):
+    """Ingest a local video file into the resource library."""
+    from videoforge.resource_library.indexer import ResourceIndexer
+
+    subtitle_paths = [args.subtitle] if args.subtitle else None
+
+    indexer = ResourceIndexer()
+    result = indexer.ingest_local(args.path, subtitle_paths=subtitle_paths)
+
+    print(f"Ingested: {args.path}")
+    print(f"  Asset ID: {result.asset_id}")
+    print(f"  Segments: {result.segments_created}")
+    print(f"  Transcripts: {result.transcripts_created}")
+    print(f"  Visual vectors: {result.visual_vectors}")
+    print(f"  Text vectors: {result.text_vectors}")
+
+
+def cmd_search_segments(args):
+    """Search indexed video segments by semantic query."""
+    from videoforge.resource_library.search import ResourceSearcher
+
+    searcher = ResourceSearcher()
+    results = searcher.search(args.query, limit=args.limit)
+
+    if not results:
+        print("No results found.")
+        return
+
+    print(f"Found {len(results)} results for: {args.query}\n")
+
+    for i, hit in enumerate(results, 1):
+        print(f"{i}. [{hit.match_type}] Score: {hit.score:.3f}")
+        print(f"   Asset: {hit.asset_path.name}")
+        print(f"   Time: {hit.start_sec:.1f}s - {hit.end_sec:.1f}s")
+        if hit.transcript_text:
+            preview = hit.transcript_text[:100] + "..." if len(hit.transcript_text) > 100 else hit.transcript_text
+            print(f"   Transcript: {preview}")
+        print()
+
+
+def cmd_rebuild_index(args):
+    """Rebuild segment-level FAISS indices from database."""
+    from videoforge.resource_library.indexer import ResourceIndexer
+
+    indexer = ResourceIndexer()
+    visual_count, text_count = indexer.rebuild_segment_indexes()
+
+    print(f"Rebuilt segment indices:")
+    print(f"  Visual index: {visual_count} vectors")
+    print(f"  Text index: {text_count} vectors")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="VideoForge CLI",
@@ -408,6 +476,27 @@ def main():
     parser_template.add_argument("--id", type=int, help="Template ID for show")
     parser_template.add_argument("--domain", help="Filter by topic domain")
     parser_template.set_defaults(func=cmd_template)
+
+    # ingest-url
+    parser_ingest_url = subparsers.add_parser("ingest-url", help="Ingest a video from URL")
+    parser_ingest_url.add_argument("url", help="Video URL (YouTube, Bilibili, etc.)")
+    parser_ingest_url.set_defaults(func=cmd_ingest_url)
+
+    # ingest-local
+    parser_ingest_local = subparsers.add_parser("ingest-local", help="Ingest a local video file")
+    parser_ingest_local.add_argument("path", help="Path to video file")
+    parser_ingest_local.add_argument("--subtitle", help="Path to subtitle file (VTT or SRT)")
+    parser_ingest_local.set_defaults(func=cmd_ingest_local)
+
+    # search-segments
+    parser_search_seg = subparsers.add_parser("search-segments", help="Search video segments")
+    parser_search_seg.add_argument("query", help="Search query")
+    parser_search_seg.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
+    parser_search_seg.set_defaults(func=cmd_search_segments)
+
+    # rebuild-segment-index
+    parser_rebuild = subparsers.add_parser("rebuild-segment-index", help="Rebuild segment FAISS indices")
+    parser_rebuild.set_defaults(func=cmd_rebuild_index)
 
     args = parser.parse_args()
 
