@@ -1,0 +1,65 @@
+name: ✨ Feature Request
+description: Suggest a new feature or improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your suggestion! Before submitting, please search existing Issues or Discussions for similar proposals.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? Describe your use case.
+      placeholder: |
+        As a knowledge content creator, I currently spend 3 hours manually editing videos.
+        I wish I could...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How would you like this feature to work?
+      placeholder: |
+        Add a new XXX module that supports:
+        1. ...
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative approaches?
+      placeholder: Could also be implemented via XXX, but...
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority (your opinion)
+      options:
+        - 🔴 High - Core functionality missing
+        - 🟡 Medium - Significant UX improvement
+        - 🟢 Low - Nice to have
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution Interest
+      options:
+        - label: I'm willing to submit a PR for this feature
+        - label: I can help with testing
+        - label: I can help with documentation
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: References, screenshots, related projects, etc.

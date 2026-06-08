@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/doufa/video-forge/discussions
+    about: Ask questions, share ideas, showcase your work
+  - name: 📖 Documentation
+    url: https://github.com/doufa/video-forge#readme
+    about: Check README and usage guide
