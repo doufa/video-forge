@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -66,7 +67,9 @@ class PipelineRunner:
 
             # 2 & 3. 逐场景生成配音与时间戳
             logger.info("=== Stage 2 & 3: TTS and Alignment ===")
-            for scene in state.script.scenes:
+            for i, scene in enumerate(state.script.scenes):
+                if i > 0:
+                    time.sleep(2)  # 避免 edge-tts 限流
                 logger.info(f"Processing TTS for scene {scene.index}...")
                 tts_res = self.tts_generator.generate(scene.narration)
                 state.tts_results.append(tts_res)

@@ -19,7 +19,7 @@ from videoforge.resource_library.subtitles import (
 )
 from videoforge.storage.database import Asset, AssetSegment, AssetTranscript, Database
 from videoforge.storage.vector_store import VectorStore
-from videoforge.utils.paths import PROJECT_ROOT, get_absolute_path, get_relative_path
+from videoforge.utils.paths import KEYFRAMES_DIR, PROJECT_ROOT, get_absolute_path, get_relative_path
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ class ResourceIndexer:
                     )
                 )
 
-                keyframe_dir = PROJECT_ROOT / "data" / "resource_library" / "keyframes" / f"asset_{asset_id}" / f"segment_{segment_id}"
+                keyframe_dir = KEYFRAMES_DIR / f"asset_{asset_id}" / f"segment_{segment_id}"
                 keyframes = sample_segment_keyframes(
                     video_path,
                     keyframe_dir,

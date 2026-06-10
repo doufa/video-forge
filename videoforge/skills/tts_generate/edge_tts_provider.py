@@ -6,6 +6,7 @@ import sys
 
 from videoforge.models import TTSResult
 from videoforge.skills.base import TTSSkill
+from videoforge.utils.paths import AUDIO_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class EdgeTTSProvider(TTSSkill):
         actual_voice = voice or self.voice
         
         # 准备输出目录
-        output_dir = Path("output/audio")
+        output_dir = AUDIO_DIR
         output_dir.mkdir(parents=True, exist_ok=True)
         
         timestamp_str = str(int(time.time() * 1000))
@@ -54,7 +55,7 @@ class EdgeTTSProvider(TTSSkill):
             except subprocess.CalledProcessError as e:
                 logger.error(f"edge-tts attempt {attempt + 1} failed: {e.stderr}")
                 if attempt < max_retries - 1:
-                    time.sleep(2)
+                    time.sleep(5 * (attempt + 1))  # 递增退避: 5s, 10s
                 else:
                     raise RuntimeError(f"TTS generation failed after {max_retries} attempts: {e.stderr}") from e
             

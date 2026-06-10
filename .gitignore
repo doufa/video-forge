@@ -28,8 +28,10 @@ Thumbs.db
 # Project
 output/*
 !output/.gitkeep
-assets/*
-!assets/.gitkeep
+library/*
+!library/.gitkeep
+projects/*
+!projects/.gitkeep
 
 # Template assets (downloaded videos, generated concat files)
 templates/hyperframes/*/assets/
@@ -46,7 +48,6 @@ templates/hyperframes/*/data.js
 .env
 config.local.yaml
 
-# Database and index files
-data/videoforge.db
-data/faiss_index.bin
-data/faiss_index.json
+# Runtime data (DB, indexes, TTS audio — all rebuildable from library/)
+data/*
+!data/.gitkeep

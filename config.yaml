@@ -66,7 +66,10 @@ skills:
       api_key: "${VISION_LLM_API_KEY}"
 
 paths:
-  assets_dir: "./assets"
+  library_dir: "./library"
+  videos_dir: "./library/videos"
+  keyframes_dir: "./library/keyframes"
+  audio_dir: "./data/audio"
   output_dir: "./output"
   data_dir: "./data"
   templates_dir: "./templates"

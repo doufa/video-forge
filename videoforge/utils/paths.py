@@ -2,6 +2,13 @@
 
 所有路径在数据库和配置中以相对路径存储，运行时动态解析为绝对路径。
 这使得整个项目目录可以作为自包含工作空间迁移。
+
+目录结构：
+  library/          - 全局知识库（跨项目复用的源视频、关键帧）
+  data/             - 运行时数据（DB、FAISS 索引、TTS 音频，可重建）
+  projects/         - 项目产出（脚本、QA 报告等）
+  output/           - 最终渲染成品
+  templates/        - 渲染模板
 """
 
 from __future__ import annotations
@@ -11,6 +18,24 @@ import re
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+# ── 目录常量 ──────────────────────────────────────────────
+LIBRARY_DIR = PROJECT_ROOT / "library"
+VIDEOS_DIR = LIBRARY_DIR / "videos"
+KEYFRAMES_DIR = LIBRARY_DIR / "keyframes"
+
+DATA_DIR = PROJECT_ROOT / "data"
+AUDIO_DIR = DATA_DIR / "audio"
+
+PROJECTS_DIR = PROJECT_ROOT / "projects"
+OUTPUT_DIR = PROJECT_ROOT / "output"
+TEMPLATES_DIR = PROJECT_ROOT / "templates"
+
+
+def ensure_dirs() -> None:
+    """确保所有标准目录存在"""
+    for d in (VIDEOS_DIR, KEYFRAMES_DIR, AUDIO_DIR, PROJECTS_DIR, OUTPUT_DIR):
+        d.mkdir(parents=True, exist_ok=True)
 
 
 def get_absolute_path(relative_path: str | Path) -> Path:

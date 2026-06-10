@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from videoforge.resource_library.models import DownloadedResource
-from videoforge.utils.paths import PROJECT_ROOT
+from videoforge.utils.paths import VIDEOS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ def download_video_resource(
 ) -> DownloadedResource:
     """Download a video URL with subtitles and metadata using yt-dlp."""
     if output_dir is None:
-        output_dir = PROJECT_ROOT / "output" / "assets"
+        output_dir = VIDEOS_DIR
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 

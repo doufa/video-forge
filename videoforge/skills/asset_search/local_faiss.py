@@ -28,7 +28,7 @@ class LocalFAISSProvider(AssetSearchSkill):
         self.config = config
         faiss_config = config.get("local_faiss", {})
 
-        self.vector_threshold = faiss_config.get("threshold", 0.5)
+        self.vector_threshold = faiss_config.get("threshold", 0.2)
         self.top_k = faiss_config.get("top_k", 5)
         self.enable_fallback = config.get("fallback") is not None
 

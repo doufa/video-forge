@@ -11,7 +11,7 @@ from videoforge.models import AssetResult
 from videoforge.skills.base import AssetSearchSkill
 from videoforge.storage import Asset, Database
 from videoforge.storage.sidecar import AssetMetadata, read_sidecar, write_sidecar
-from videoforge.utils.paths import get_relative_path
+from videoforge.utils.paths import VIDEOS_DIR, get_relative_path
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class YTDLPSearchProvider(AssetSearchSkill):
 
     def __init__(self, config: dict):
         self.config = config.get("ytdlp", {})
-        self.assets_dir = Path("output/assets")
+        self.assets_dir = VIDEOS_DIR
         self.assets_dir.mkdir(parents=True, exist_ok=True)
 
     def _slugify(self, text: str) -> str:

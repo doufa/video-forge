@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 from videoforge.storage import Database, Asset, read_sidecar
-from videoforge.utils.paths import PROJECT_ROOT, get_relative_path, get_absolute_path
+from videoforge.utils.paths import PROJECT_ROOT, VIDEOS_DIR, get_relative_path, get_absolute_path
 
 
 def format_size(size_bytes: int) -> str:
@@ -66,7 +66,7 @@ def cmd_stats(args):
 
 def cmd_scan(args):
     """扫描并索引现有素材到数据库"""
-    scan_dir = Path(args.dir) if args.dir else PROJECT_ROOT / "output" / "assets"
+    scan_dir = Path(args.dir) if args.dir else VIDEOS_DIR
 
     if not scan_dir.exists():
         print(f"Directory not found: {scan_dir}")
